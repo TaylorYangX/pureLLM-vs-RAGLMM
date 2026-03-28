@@ -1,21 +1,20 @@
-# RAG vs Baseline LLM: 多指标评估实验复现
+# RAG vs Baseline LLM: 多指标评估实验
 
-> 论文复现: *"Retrieval-Augmented Generation vs. Baseline LLMs: A Multi-Metric Evaluation for Knowledge-Intensive Content"*
-> (Information 2025, 16, 766)
+> 基于论文 *"Retrieval-Augmented Generation vs. Baseline LLMs: A Multi-Metric Evaluation"* 的方法论实现。
+> 本项目已泛化为通用的 RAG 评估框架，支持任意领域的知识文档。
 
 ## 📋 项目概述
 
-本项目完整复现了论文中的实验管道，比较 4 个 Baseline LLM 与 RAG-Augmented LLM 在知识密集型任务上的表现。
+本项目实现了完整的 RAG (检索增强生成) 评估管道，比较 Baseline LLM 与 RAG-Augmented LLM 在知识密集型任务上的表现。
 
-### 评估模型
-| 模型 | 参数量 | 最低显存 |
-|------|-------|---------|
-| TinyLlama | 1.1B | 1 GB |
-| Mistral 7B | 7.3B | 7 GB |
-| Llama 3.1 8B | 8B | 8 GB |
-| Llama 1 13B | 13B | 13 GB |
+### 核心特性
+- ✅ **通用化**：支持任意 PDF/XLSX 知识文档，不限于特定领域
+- ✅ **自动化**：一键构建索引、生成 Ground Truth、运行实验、评估、可视化
+- ✅ **模块化**：每个步骤独立执行，便于调试和定制
+- ✅ **7 个评估指标**：BLEU、ROUGE-1/2/L、BERTScore P/R/F1
+- ✅ **统计分析**：90% 置信区间、百分比改进
 
-### 评估指标（7个）
+### 评估指标
 | 类别 | 指标 | 说明 |
 |------|------|------|
 | 词汇相似度 | BLEU | n-gram 精确度 |
@@ -30,25 +29,42 @@
 
 ```
 pureLLM-vs-RAGLMM/
+│
+│  # ===== 分步执行脚本（推荐） =====
+├── step1_build_index.py            # 步骤1：构建 FAISS 向量索引
+├── step2_generate_ground_truth.py  # 步骤2：生成 Ground Truth
+├── step3_run_experiments.py        # 步骤3：运行 Baseline + RAG 实验
+├── step4_evaluate.py               # 步骤4：计算评估指标
+├── step5_visualize.py              # 步骤5：生成可视化图表
+│
+│  # ===== 可选的一键入口 =====
+├── main.py                         # 一键运行所有步骤
+│
+│  # ===== 核心模块 =====
 ├── config/
-│   └── model_config.py        # 模型API配置（key, URL, 模型名）
+│   └── model_config.py             # 统一配置（模型、RAG参数、实验参数）
 ├── data/
-│   ├── dataset_loader.py      # 数据加载（PDF文档、Ground Truth）
-│   └── ground_truth.json      # 11组查询+标准答案
+│   ├── dataset_loader.py           # 文档加载器（PDF + XLSX）
+│   └── ground_truth.json           # Ground Truth 数据（自动/手动生成）
 ├── models/
-│   ├── llm_baseline.py        # Baseline LLM调用
-│   └── rag_pipeline.py        # RAG完整流程（检索+生成）
+│   ├── llm_baseline.py             # Baseline LLM 调用
+│   └── rag_pipeline.py             # RAG 完整流程（检索+生成）
 ├── retrieval/
-│   └── retriever.py           # FAISS向量检索
+│   └── retriever.py                # FAISS 向量检索器
 ├── evaluation/
-│   └── metrics.py             # 7个评估指标实现
+│   └── metrics.py                  # 7 个评估指标实现
 ├── visualization/
-│   └── plot_results.py        # 论文图表复现
-├── results/                   # 实验结果输出
-├── figures/                   # 图表输出
-├── main.py                    # 主程序入口
-├── requirements.txt           # Python依赖
-└── README.md                  # 本文件
+│   └── plot_results.py             # 论文图表复现
+├── generate_ground_truth.py        # Ground Truth 生成器（核心逻辑）
+│
+│  # ===== 输出目录 =====
+├── VectorDB/                       # FAISS 向量索引存储
+├── results/                        # 实验结果输出
+├── figures/                        # 图表输出
+│
+│  # ===== 配置 =====
+├── requirements.txt                # Python 依赖
+└── README.md                       # 本文件
 ```
 
 ## 🚀 快速开始
@@ -56,185 +72,230 @@ pureLLM-vs-RAGLMM/
 ### 1. 安装依赖
 
 ```bash
-# 创建虚拟环境（推荐）
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或 venv\Scripts\activate  # Windows
-
-# 安装依赖
-pip install -r requirements.txt
+python3 -m pip install -r requirements.txt
 ```
 
-### 2. 配置模型 API
+### 2. 准备文档
 
-本项目默认使用 [Ollama](https://ollama.com/) 作为 LLM 推理后端。
+将你的知识文档放入 `data/` 目录：
 
-#### 安装并启动 Ollama
 ```bash
-# 安装 Ollama（Linux）
-curl -fsSL https://ollama.com/install.sh | sh
+# 支持的格式：PDF 和 XLSX
+cp your_document.pdf data/
+cp your_data.xlsx data/
+```
 
-# 启动服务
+> **重要**：无需手动下载特定文档，项目会自动扫描 `data/` 目录中的所有 PDF 和 XLSX 文件。
+
+### 3. 配置 LLM
+
+本项目默认使用 [Ollama](https://ollama.com/) 作为推理后端：
+
+```bash
+# 安装并启动 Ollama
 ollama serve
 
-# 拉取所需模型
+# 拉取模型
 ollama pull tinyllama
 ollama pull mistral
 ollama pull llama3.1
 ollama pull llama2:13b
 ```
 
-#### 使用其他 API（如 Together AI、OpenRouter）
-修改 `config/model_config.py` 中的配置，或通过环境变量设置：
-
-```bash
-export MISTRAL_API_KEY="your-api-key"
-export MISTRAL_BASE_URL="https://api.together.xyz/v1"
-export MISTRAL_MODEL="mistralai/Mistral-7B-Instruct-v0.1"
-```
-
-### 3. 准备知识文档
-
-论文使用 "Human Nutrition: 2020 Edition" 教科书。程序会自动尝试下载，或手动放置：
-
-```bash
-# 下载文档并放到 data/ 目录
-# 文件路径: data/human_nutrition_2020.pdf
-```
+如需使用其他 API（如 OpenAI、Together AI），修改 `config/model_config.py` 或设置环境变量。
 
 ### 4. 运行实验
 
+#### 方式一：分步执行（推荐）
+
 ```bash
-# 完整实验（11查询 × 11迭代 × 4模型 × 2模式 = 968个输出）
-python main.py
+# 步骤1：构建向量索引 → 保存到 VectorDB/
+python step1_build_index.py
 
-# 快速测试（3查询 × 2迭代，验证流程是否正确）
-python main.py --quick
+# 步骤2：自动生成 Ground Truth → data/ground_truth.json
+python step2_generate_ground_truth.py
 
-# 试运行（仅验证配置和数据，不执行实验）
-python main.py --dry-run
+# 步骤3：运行 Baseline + RAG 实验 → results/raw_outputs_*.csv
+python step3_run_experiments.py
 
-# 指定模型
-python main.py --models mistral llama3.1
+# 步骤4：计算所有评估指标 → results/evaluation_stats_*.json
+python step4_evaluate.py
 
-# 自定义迭代次数
-python main.py --iterations 5
+# 步骤5：生成论文图表 → figures/*.png
+python step5_visualize.py
+```
 
-# 仅生成图表（使用已有结果）
-python main.py --plot-only
+#### 方式二：一键执行
+
+```bash
+python main.py                     # 执行所有步骤
+python main.py --quick             # 快速测试
+python main.py --skip-gt           # 跳过 Ground Truth 生成
+python main.py --skip-index        # 跳过索引构建
+```
+
+## 📝 各步骤详细说明
+
+### Step 1: 构建向量索引 (`step1_build_index.py`)
+- **输入**：`data/` 目录中的 PDF 和 XLSX 文件
+- **输出**：`VectorDB/` 目录（包含 FAISS 索引和文档数据）
+- **功能**：加载文档 → 提取文本 → 切分为块 → 向量化 → 构建 FAISS 索引
+
+```bash
+python step1_build_index.py
+python step1_build_index.py --rebuild           # 强制重建
+python step1_build_index.py --chunk-size 500    # 自定义块大小
+```
+
+### Step 2: 生成 Ground Truth (`step2_generate_ground_truth.py`)
+- **输入**：`data/` 中的文档 + 高级 LLM API
+- **输出**：`data/ground_truth.json`
+- **功能**：从文档中采样段落 → 调用 LLM 生成查询-答案对
+
+```bash
+python step2_generate_ground_truth.py
+python step2_generate_ground_truth.py --num-entries 20        # 生成 20 条
+python step2_generate_ground_truth.py --complexity complex    # 高复杂度
+python step2_generate_ground_truth.py --skip                  # 跳过生成
+```
+
+**复杂度等级说明**：
+| 等级 | 说明 | 答案长度 |
+|------|------|---------|
+| `simple` | 事实性问答（what/who/when/where） | 1-2 句 |
+| `medium` | 理解性问答（how/why） | 2-4 句 |
+| `complex` | 分析性问答（比较、因果、综合） | 3-6 句 |
+
+### Step 3: 运行实验 (`step3_run_experiments.py`)
+- **输入**：`VectorDB/` + `data/ground_truth.json` + LLM API
+- **输出**：`results/raw_outputs_YYYYMMDD_HHMMSS.csv`
+- **功能**：对每个模型运行 Baseline 和 RAG 模式的生成
+
+```bash
+python step3_run_experiments.py
+python step3_run_experiments.py --quick                    # 快速测试
+python step3_run_experiments.py --models mistral llama3.1  # 指定模型
+python step3_run_experiments.py --iterations 5             # 自定义迭代
+```
+
+### Step 4: 评估结果 (`step4_evaluate.py`)
+- **输入**：`results/raw_outputs_*.csv` + `data/ground_truth.json`
+- **输出**：
+  - `results/evaluation_stats_YYYYMMDD_HHMMSS.json`（统计结果）
+  - `results/improvement_summary_YYYYMMDD_HHMMSS.csv`（改进汇总）
+- **功能**：计算 7 个指标 + 90% 置信区间
+
+```bash
+python step4_evaluate.py
+python step4_evaluate.py --input results/raw_outputs_20260328.csv
+```
+
+### Step 5: 生成图表 (`step5_visualize.py`)
+- **输入**：`results/evaluation_stats_*.json`
+- **输出**：`figures/*.png`（5 张图表）
+- **功能**：复现论文中的 Figure 3/4/5 和 Table 3
+
+```bash
+python step5_visualize.py
+python step5_visualize.py --input results/evaluation_stats_20260328.json
+```
+
+## ⚙️ 配置说明
+
+所有配置集中在 `config/model_config.py`：
+
+### LLM 模型配置
+```python
+# 修改模型或切换 API 提供商
+LLM_CONFIGS = {
+    "mistral": {
+        "api_key": os.environ.get("MISTRAL_API_KEY", "ollama"),
+        "base_url": os.environ.get("MISTRAL_BASE_URL", "http://localhost:11434/v1"),
+        "model_name": "mistral",
+        "temperature": 0.7,
+        "max_tokens": 1024,
+    },
+    # ... 其他模型
+}
+```
+
+### Ground Truth 生成 LLM（建议使用更强的模型）
+```python
+GROUND_TRUTH_LLM_CONFIG = {
+    "api_key": os.environ.get("GT_LLM_API_KEY", "ollama"),
+    "base_url": os.environ.get("GT_LLM_BASE_URL", "http://localhost:11434/v1"),
+    "model_name": os.environ.get("GT_LLM_MODEL", "llama3.1"),
+    "temperature": 0.3,     # 低温度，确保准确性
+    "max_tokens": 2048,
+}
+```
+
+### Ground Truth 生成参数
+```python
+GROUND_TRUTH_CONFIG = {
+    "num_entries": 11,       # 生成条目数
+    "complexity": "medium",  # simple/medium/complex
+    "enabled": True,         # 是否启用自动生成
+}
+```
+
+### RAG 参数
+```python
+RAG_CONFIG = {
+    "chunk_size": 1000,      # 文档块大小
+    "chunk_overlap": 200,    # 块间重叠
+    "top_k": 5,              # 检索返回数量
+}
+```
+
+### 环境变量覆盖
+```bash
+# Ground Truth 生成 LLM（推荐使用 GPT-4 或 Claude）
+export GT_LLM_API_KEY="your-key"
+export GT_LLM_BASE_URL="https://api.openai.com/v1"
+export GT_LLM_MODEL="gpt-4"
+
+# 条目数量和复杂度
+export GT_NUM_ENTRIES=20
+export GT_COMPLEXITY=complex
+
+# 禁用自动生成
+export GT_ENABLED=false
 ```
 
 ## 📊 输出说明
 
 ### 结果文件（results/）
-- `evaluation_stats_YYYYMMDD_HHMMSS.json` — 结构化统计结果（均值+置信区间）
-- `raw_outputs_YYYYMMDD_HHMMSS.csv` — 原始模型输出
-- `improvement_summary_YYYYMMDD_HHMMSS.csv` — RAG改进百分比汇总
+| 文件 | 说明 |
+|------|------|
+| `raw_outputs_*.csv` | 原始模型输出（查询、迭代、响应、延迟） |
+| `evaluation_stats_*.json` | 结构化统计结果（均值+置信区间） |
+| `improvement_summary_*.csv` | RAG 改进百分比汇总 |
 
 ### 图表文件（figures/）
-- `fig3_lexical_comparison.png` — 词汇相似度对比图
-- `fig4_semantic_comparison.png` — 语义相似度对比图
-- `table3_improvement_heatmap.png` — 改进百分比热力图
-- `fig5_cross_model_comparison.png` — 跨模型对比图
-- `all_metrics_overview.png` — 综合概览图
+| 文件 | 对应论文 | 说明 |
+|------|---------|------|
+| `fig3_lexical_comparison.png` | Figure 3 | BLEU/ROUGE 对比 |
+| `fig4_semantic_comparison.png` | Figure 4 | BERTScore 对比 |
+| `table3_improvement_heatmap.png` | Table 3 | 改进百分比热力图 |
+| `fig5_cross_model_comparison.png` | Figure 5 | 跨模型对比 |
+| `all_metrics_overview.png` | — | 综合概览 |
 
-## 🔧 RAG 流程详解
-
-```
-1. 文档加载 (load_pdf_document)
-   ↓ PDF → 纯文本
-2. 文档切分 (split_documents)
-   ↓ 长文本 → chunk_size=1000, overlap=200
-3. 向量化 (encode_documents)
-   ↓ 使用 all-MiniLM-L6-v2 生成 384维向量
-4. 向量检索 (FAISS search)
-   ↓ 查询 → Top-5 相似文档
-5. 拼接上下文 (get_context_string)
-   ↓ 5个段落 → 拼接为上下文
-6. 输入LLM生成 (generate)
-   ↓ context + query → LLM → answer
-```
-
-## 📝 示例输入输出
-
-### 查询示例
-```
-Q1: What are the main functions of carbohydrates in the human body?
-```
-
-### Baseline LLM 输出（无检索）
-```
-Carbohydrates provide energy for the body. They are one of the three
-macronutrients along with proteins and fats...
-(基于模型参数知识的回答，可能不够准确或全面)
-```
-
-### RAG-Augmented LLM 输出（有检索增强）
-```
-Based on the provided context, carbohydrates serve several essential
-functions: they are the primary source of energy, providing fuel for
-the brain, central nervous system, and muscles during exercise...
-(基于检索文档的回答，更准确和全面)
-```
-
-### 评估结果示例
-```
-BLEU:           0.04 → 0.064  (+60.5%)
-ROUGE-L:        0.18 → 0.227  (+28.0%)
-BERTScore F1:   0.855 → 0.876 (+2.8%)
-```
-
-## ⚙️ 自定义配置
-
-### 修改 RAG 参数
-在 `config/model_config.py` 中调整：
-```python
-RAG_CONFIG = {
-    "chunk_size": 1000,    # 文档块大小
-    "chunk_overlap": 200,  # 块间重叠
-    "top_k": 5,            # 检索返回数量
-}
-```
-
-### 修改实验参数
-```python
-EXPERIMENT_CONFIG = {
-    "num_queries": 11,          # 查询数量
-    "num_iterations": 11,       # 迭代次数
-    "confidence_level": 0.90,  # 置信水平
-}
-```
-
-### 自定义 Ground Truth
-编辑 `data/ground_truth.json`，格式：
-```json
-[
-  {
-    "query_id": 1,
-    "query": "你的问题",
-    "ground_truth": "标准答案",
-    "source_passage": "来源段落"
-  }
-]
-```
+### 向量索引（VectorDB/）
+| 文件 | 说明 |
+|------|------|
+| `index.faiss` | FAISS 向量索引文件 |
+| `documents.pkl` | 原始文档块和向量矩阵 |
 
 ## 📖 文件详细说明
 
-| 文件 | 作用 | 关键类/函数 |
-|------|------|------------|
-| `config/model_config.py` | API配置管理 | `LLM_CONFIGS`, `EMBEDDING_CONFIG`, `RAG_CONFIG` |
-| `data/dataset_loader.py` | 数据加载 | `load_pdf_document()`, `split_documents()`, `load_ground_truth()` |
-| `retrieval/retriever.py` | FAISS检索 | `FAISSRetriever` 类 |
+| 文件 | 作用 | 核心 API |
+|------|------|---------|
+| `config/model_config.py` | 统一配置管理 | `LLM_CONFIGS`, `EMBEDDING_CONFIG`, `GROUND_TRUTH_CONFIG` |
+| `data/dataset_loader.py` | PDF + XLSX 文档加载 | `load_document()`, `load_all_documents()`, `split_documents()` |
+| `generate_ground_truth.py` | Ground Truth 生成器 | `generate_ground_truth()`, `generate_qa_pair()` |
+| `retrieval/retriever.py` | FAISS 向量检索 | `FAISSRetriever` 类 |
 | `models/llm_baseline.py` | Baseline LLM | `BaselineLLM` 类 |
-| `models/rag_pipeline.py` | RAG流程 | `RAGPipeline` 类 |
+| `models/rag_pipeline.py` | RAG 流程 | `RAGPipeline` 类 |
 | `evaluation/metrics.py` | 评估指标 | `compute_bleu()`, `compute_rouge()`, `compute_bertscore()` |
 | `visualization/plot_results.py` | 图表生成 | `generate_all_plots()` |
-| `main.py` | 主程序 | `main()` |
-
-## 📚 参考文献
-
-- Papineni et al. "BLEU: A Method for Automatic Evaluation of Machine Translation" (ACL 2002)
-- Lin & Och. "ROUGE and its Evaluation" (NTCIR 2004)
-- Zhang et al. "BERTScore: Evaluating Text Generation with BERT" (ICLR 2020)
-- Douze et al. "The Faiss Library" (2024)
-- Yin & Zhang. "Sentence Similarity Based on all-MiniLM-L6-v2" (ICIAAI 2024)

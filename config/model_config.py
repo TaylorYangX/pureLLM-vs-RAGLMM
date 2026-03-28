@@ -9,12 +9,14 @@
     2. RAG 中生成模型的 API 配置
     3. Embedding 模型配置
     4. RAG 流程参数配置
-    5. 实验参数配置
+    5. Ground Truth 生成配置（使用高级 LLM）
+    6. 实验参数配置
 
 设计原则：
     - 所有 API 密钥和端点通过环境变量或此文件集中管理
     - 模型名称不硬编码在业务逻辑中
     - 支持 OpenAI 兼容格式的 API（如 Ollama、vLLM、Together AI）
+    - 项目不绑定任何特定领域，支持任意知识文档
 
 使用方式：
     from config.model_config import LLM_CONFIGS, EMBEDDING_CONFIG, RAG_CONFIG
@@ -24,7 +26,7 @@ import os
 
 
 # =============================================
-# 1. LLM 模型配置
+# 1. LLM 模型配置（用于 Baseline 和 RAG 生成）
 # =============================================
 # 说明：
 #   - 每个模型对应一个独立的配置字典
@@ -33,9 +35,6 @@ import os
 #   - model_name: 模型在 API 端点中的注册名称
 #   - temperature: 控制输出随机性，0 表示确定性输出，1 表示最大随机性
 #   - max_tokens: 生成的最大 token 数量
-#
-# 论文使用的4个模型：
-#   TinyLlama 1.1B, Mistral 7B, Llama 3.1 8B, Llama 1 13B
 
 LLM_CONFIGS = {
     # ---- TinyLlama 1.1B ----
@@ -44,8 +43,8 @@ LLM_CONFIGS = {
         "api_key": os.environ.get("TINYLLAMA_API_KEY", "ollama"),
         "base_url": os.environ.get("TINYLLAMA_BASE_URL", "http://localhost:11434/v1"),
         "model_name": os.environ.get("TINYLLAMA_MODEL", "tinyllama"),
-        "temperature": 0.7,   # 论文中使用适度随机性以捕捉输出变异性
-        "max_tokens": 1024,   # 限制输出长度，与论文设置一致
+        "temperature": 0.7,
+        "max_tokens": 1024,
     },
 
     # ---- Mistral 7B ----
@@ -81,14 +80,31 @@ LLM_CONFIGS = {
 
 
 # =============================================
-# 2. Embedding 模型配置
+# 2. Ground Truth 生成 LLM 配置
 # =============================================
 # 说明：
-#   论文使用 sentence-transformers 的 "all-MiniLM-L6-v2" 模型
+#   用于自动生成 Ground Truth 数据的高级 LLM 配置。
+#   建议使用能力更强的模型（如 GPT-4、Claude、Qwen-72B 等），
+#   以确保生成的查询和答案质量足够高。
+#   该模型仅在 step2_generate_ground_truth.py 中使用。
+
+GROUND_TRUTH_LLM_CONFIG = {
+    "api_key": os.environ.get("GT_LLM_API_KEY", "ollama"),
+    "base_url": os.environ.get("GT_LLM_BASE_URL", "http://localhost:11434/v1"),
+    "model_name": os.environ.get("GT_LLM_MODEL", "llama3.1"),
+    "temperature": 0.3,    # 较低温度，确保生成内容准确、稳定
+    "max_tokens": 2048,    # Ground Truth 答案可能较长，需要更多 token
+}
+
+
+# =============================================
+# 3. Embedding 模型配置
+# =============================================
+# 说明：
+#   使用 sentence-transformers 的 "all-MiniLM-L6-v2" 模型
 #   该模型在准确性和速度之间取得良好平衡：
 #   - 与 BGE-Large 等大模型检索性能接近
 #   - 但速度更快、体积更小
-#   - 适合大规模多查询 RAG 评估
 #
 # 支持两种模式：
 #   1. 本地模式（默认）：使用 sentence-transformers 库直接加载
@@ -101,7 +117,7 @@ EMBEDDING_CONFIG = {
     # 本地模式配置
     "model_name": os.environ.get(
         "EMBEDDING_MODEL", "all-MiniLM-L6-v2"
-    ),  # 论文指定的 embedding 模型
+    ),
 
     # API 模式配置（当 mode="api" 时使用）
     "api_key": os.environ.get("EMBEDDING_API_KEY", ""),
@@ -114,7 +130,7 @@ EMBEDDING_CONFIG = {
 
 
 # =============================================
-# 3. RAG 流程配置
+# 4. RAG 流程配置
 # =============================================
 # 说明：
 #   控制 RAG 流程中文档处理和检索的关键参数
@@ -122,26 +138,14 @@ EMBEDDING_CONFIG = {
 
 RAG_CONFIG = {
     # ---- 文档切分参数 ----
-    # chunk_size: 每个文档块的字符数
-    # 较大的 chunk 保留更多上下文，但可能引入噪声
-    # 较小的 chunk 更精确，但可能丢失上下文
-    "chunk_size": 1000,
-
-    # chunk_overlap: 相邻块之间的重叠字符数
-    # 重叠确保跨块边界的信息不丢失
-    "chunk_overlap": 200,
-
-    # separator: 文本分隔符，用于优先在自然边界处切分
-    "separator": "\n",
+    "chunk_size": 1000,       # 每个文档块的字符数
+    "chunk_overlap": 200,     # 相邻块之间的重叠字符数
+    "separator": "\n",        # 文本分隔符
 
     # ---- 检索参数 ----
-    # top_k: 检索返回的最相似文档数量
-    # 论文明确指定 top_k = 5
-    "top_k": 5,
+    "top_k": 5,               # 检索返回的最相似文档数量
 
     # ---- 提示模板 ----
-    # RAG 生成时使用的提示模板
-    # 遵循 LangChain 风格：将检索到的上下文与查询组合
     "prompt_template": """You are a knowledgeable assistant. Use the following retrieved context to answer the question accurately and comprehensively.
 
 Context:
@@ -154,45 +158,60 @@ Answer: Based on the provided context, """,
 
 
 # =============================================
-# 4. 实验配置
+# 5. 实验配置
 # =============================================
 # 说明：
 #   控制实验运行的核心参数
-#   论文中每个模型运行 11 个查询 × 11 次迭代 = 121 个输出
 
 EXPERIMENT_CONFIG = {
-    # num_queries: 评估使用的查询数量（论文使用 11 个）
-    "num_queries": 11,
-
-    # num_iterations: 每个查询的重复执行次数（论文使用 11 次）
-    # 多次执行用于捕捉输出变异性，确保可重复性
+    # 每个查询的重复执行次数（用于捕捉输出变异性）
     "num_iterations": 11,
 
-    # confidence_level: 置信区间的置信水平（论文使用 90%）
+    # 置信区间的置信水平
     "confidence_level": 0.90,
 
-    # output_dir: 结果输出目录
+    # 输出目录
     "output_dir": "results",
-
-    # figure_dir: 图表输出目录
     "figure_dir": "figures",
 
-    # ground_truth_path: Ground Truth 数据文件路径
+    # Ground Truth 数据文件路径
     "ground_truth_path": "data/ground_truth.json",
 
-    # document_path: 知识文档路径（PDF）
-    # 论文使用 "Human Nutrition: 2020 Edition"
-    "document_path": os.environ.get(
-        "DOCUMENT_PATH", "data/human_nutrition_2020.pdf"
-    ),
+    # 知识文档目录（放置 PDF/XLSX 文件的目录）
+    "data_dir": "data",
 
-    # document_url: 文档下载 URL（备用）
-    "document_url": "https://pressbooks.oer.hawaii.edu/humannutrition2/open/download?type=pdf",
+    # 向量索引保存目录
+    "vector_db_dir": "VectorDB",
 }
 
 
 # =============================================
-# 5. 辅助函数
+# 6. Ground Truth 生成配置
+# =============================================
+# 说明：
+#   控制 step2_generate_ground_truth.py 的行为
+
+GROUND_TRUTH_CONFIG = {
+    # 生成条目数量（默认 11 条，与论文一致）
+    "num_entries": int(os.environ.get("GT_NUM_ENTRIES", "11")),
+
+    # 生成复杂度等级：
+    #   "simple"   — 事实性问答，答案简短直接
+    #   "medium"   — 需要一定推理，答案包含解释
+    #   "complex"  — 综合性问题，需要多段落推理，答案详细
+    "complexity": os.environ.get("GT_COMPLEXITY", "medium"),
+
+    # 是否启用 Ground Truth 生成步骤
+    # 设为 False 时 step2 将跳过生成，直接使用已有 ground_truth.json
+    "enabled": os.environ.get("GT_ENABLED", "true").lower() == "true",
+
+    # 输出路径
+    "output_path": "data/ground_truth.json",
+}
+
+
+# =============================================
+# 7. 辅助函数
 # =============================================
 
 def get_llm_config(model_key: str) -> dict:
@@ -238,7 +257,6 @@ def print_config_summary():
 
     print("\n🤖 LLM 模型配置:")
     for key, config in LLM_CONFIGS.items():
-        # 隐藏 API 密钥，仅显示前4位
         masked_key = config["api_key"][:4] + "****" if len(config["api_key"]) > 4 else "****"
         print(f"  [{key}]")
         print(f"    模型名称: {config['model_name']}")
@@ -246,6 +264,12 @@ def print_config_summary():
         print(f"    API 密钥: {masked_key}")
         print(f"    Temperature: {config['temperature']}")
         print(f"    Max Tokens: {config['max_tokens']}")
+
+    print(f"\n🧠 Ground Truth 生成 LLM:")
+    gt_key = GROUND_TRUTH_LLM_CONFIG["api_key"][:4] + "****" if len(GROUND_TRUTH_LLM_CONFIG["api_key"]) > 4 else "****"
+    print(f"    模型: {GROUND_TRUTH_LLM_CONFIG['model_name']}")
+    print(f"    API 地址: {GROUND_TRUTH_LLM_CONFIG['base_url']}")
+    print(f"    API 密钥: {gt_key}")
 
     print(f"\n🔗 Embedding 配置:")
     print(f"    模式: {EMBEDDING_CONFIG['mode']}")
@@ -257,9 +281,14 @@ def print_config_summary():
     print(f"    Top-K: {RAG_CONFIG['top_k']}")
 
     print(f"\n🧪 实验配置:")
-    print(f"    查询数量: {EXPERIMENT_CONFIG['num_queries']}")
     print(f"    迭代次数: {EXPERIMENT_CONFIG['num_iterations']}")
     print(f"    置信水平: {EXPERIMENT_CONFIG['confidence_level']}")
+    print(f"    向量库目录: {EXPERIMENT_CONFIG['vector_db_dir']}")
+
+    print(f"\n📝 Ground Truth 配置:")
+    print(f"    条目数量: {GROUND_TRUTH_CONFIG['num_entries']}")
+    print(f"    复杂度: {GROUND_TRUTH_CONFIG['complexity']}")
+    print(f"    启用生成: {GROUND_TRUTH_CONFIG['enabled']}")
     print("=" * 60)
 
 

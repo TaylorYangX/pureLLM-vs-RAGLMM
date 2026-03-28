@@ -307,7 +307,7 @@ class FAISSRetriever:
 
         return all_results
 
-    def save_index(self, save_dir: str = "data/faiss_index"):
+    def save_index(self, save_dir: str = "VectorDB"):
         """
         将 FAISS 索引和文档数据持久化到磁盘。
 
@@ -332,7 +332,7 @@ class FAISSRetriever:
             }, f)
         print(f"💾 文档数据已保存: {data_path}")
 
-    def load_index(self, save_dir: str = "data/faiss_index") -> bool:
+    def load_index(self, save_dir: str = "VectorDB") -> bool:
         """
         从磁盘加载已保存的 FAISS 索引和文档数据。
 
