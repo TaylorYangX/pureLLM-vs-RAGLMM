@@ -11,10 +11,10 @@
 
     输出图表：
     - figures/fig3_lexical_comparison.png   （词汇相似度对比）
-    - figures/fig4_semantic_comparison.png  （语义相似度对比）
-    - figures/table3_improvement_heatmap.png（改进百分比热力图）
-    - figures/fig5_cross_model_comparison.png（跨模型对比）
-    - figures/all_metrics_overview.png      （综合概览）
+    - figures/fig4_semantic_comparison.png  （语义相似度对比，含 NLI）
+    - figures/table3_improvement_heatmap.png（改进百分比热力图，含 NLI）
+    - figures/fig5_cross_model_comparison.png（跨模型对比，含 NLI）
+    - figures/all_metrics_overview.png      （综合概览，含 NLI）
 
 使用方式：
     python step5_visualize.py
@@ -36,16 +36,15 @@ from visualization.plot_results import generate_all_plots
 
 def parse_args():
     """解析命令行参数。"""
-    parser = argparse.ArgumentParser(
-        description="步骤 5: 生成可视化图表"
+    parser = argparse.ArgumentParser(description="步骤 5: 生成可视化图表")
+    parser.add_argument(
+        "--input",
+        type=str,
+        default=None,
+        help="评估统计 JSON 文件路径（默认使用最新的）",
     )
     parser.add_argument(
-        "--input", type=str, default=None,
-        help="评估统计 JSON 文件路径（默认使用最新的）"
-    )
-    parser.add_argument(
-        "--figure-dir", type=str, default=None,
-        help="图表输出目录（默认 figures）"
+        "--figure-dir", type=str, default=None, help="图表输出目录（默认 figures）"
     )
     return parser.parse_args()
 
@@ -61,7 +60,8 @@ def find_latest_stats(output_dir: str) -> str:
         str: 最新文件的完整路径
     """
     files = [
-        f for f in os.listdir(output_dir)
+        f
+        for f in os.listdir(output_dir)
         if f.startswith("evaluation_stats_") and f.endswith(".json")
     ]
     if not files:

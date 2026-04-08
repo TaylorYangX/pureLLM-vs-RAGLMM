@@ -1,68 +1,32 @@
 [
   {
-    "query_id": 1,
-    "query": "What are the main functions of carbohydrates in the human body?",
-    "ground_truth": "Carbohydrates serve several essential functions in the human body. They are the primary source of energy, providing fuel for the brain, central nervous system, and muscles during exercise. Glucose, derived from carbohydrates, is the preferred energy source for the brain. Carbohydrates also play a role in sparing protein from being used as energy, enabling protein to fulfill its primary role in tissue building and repair. Additionally, carbohydrates are necessary for the complete oxidation of fats, preventing the accumulation of ketone bodies. Dietary fiber, a type of carbohydrate, aids in maintaining digestive health and regular bowel movements.",
-    "source_passage": "Chapter on Carbohydrates - Human Nutrition 2020 Edition"
-  },
-  {
-    "query_id": 2,
-    "query": "What is the difference between water-soluble and fat-soluble vitamins?",
-    "ground_truth": "Water-soluble vitamins include vitamin C and the B-complex vitamins (thiamin, riboflavin, niacin, vitamin B6, folate, vitamin B12, biotin, and pantothenic acid). These vitamins dissolve in water, are not stored in significant amounts in the body, and excess intake is typically excreted through urine. They generally need to be consumed more regularly. Fat-soluble vitamins include vitamins A, D, E, and K. These vitamins dissolve in fat, are absorbed with dietary fat, and can be stored in the body's fatty tissue and liver for extended periods. Because they are stored, excessive intake of fat-soluble vitamins can lead to toxicity.",
-    "source_passage": "Chapter on Vitamins - Human Nutrition 2020 Edition"
-  },
-  {
     "query_id": 3,
-    "query": "How does the body regulate blood glucose levels?",
-    "ground_truth": "Blood glucose regulation involves a hormonal feedback system primarily managed by the pancreas. When blood glucose levels rise after eating, the pancreas releases insulin, which signals cells to take up glucose from the blood, thereby lowering blood glucose levels. Insulin also promotes the storage of excess glucose as glycogen in the liver and muscles. Conversely, when blood glucose levels drop between meals or during physical activity, the pancreas releases glucagon, which stimulates the liver to break down stored glycogen into glucose and release it into the bloodstream. This feedback mechanism maintains blood glucose within a narrow, healthy range. Disruption of this system can lead to conditions such as diabetes mellitus.",
-    "source_passage": "Chapter on Carbohydrate Metabolism - Human Nutrition 2020 Edition"
-  },
-  {
-    "query_id": 4,
-    "query": "What are essential amino acids and why are they important?",
-    "ground_truth": "Essential amino acids are amino acids that the human body cannot synthesize on its own and must be obtained through dietary intake. There are nine essential amino acids: histidine, isoleucine, leucine, lysine, methionine, phenylalanine, threonine, tryptophan, and valine. They are important because they serve as building blocks for protein synthesis, which is critical for growth, tissue repair, immune function, enzyme production, and hormone synthesis. Complete proteins, found in animal sources such as meat, fish, eggs, and dairy, contain all essential amino acids in adequate amounts. Plant-based proteins are often incomplete, lacking one or more essential amino acids, which is why combining different plant protein sources is recommended for those following vegetarian or vegan diets.",
-    "source_passage": "Chapter on Proteins - Human Nutrition 2020 Edition"
+    "query": "What methods are employed to mitigate exploitation behavior, and what factors limit the effectiveness of these protections across different software?",
+    "ground_truth": "Security applications such as Windows Defender Exploit Guard and the Enhanced Mitigation Experience Toolkit can be used to mitigate exploitation behavior by looking for specific behaviors used during exploitation. Additionally, control flow integrity checking serves as another method to potentially identify and stop a software exploit from occurring. However, many of these protections depend on the architecture and target application binary for compatibility, meaning they may not work for all software or services targeted.",
+    "source_passage": "M0950\tExploit Protection\tcourse-of-action--49363b74-d506-4342-bd63-320586ebadb9\tmitigation\tmitigates\tT0866\tExploitation of Remote Services\tattack-pattern--85a45294-08f1-4539-bf00-7da08aa7b0ee\ttechnique\tSecurity applications that look for behavior used during exploitation such as Windows Defender Exploit Guard (WDEG) and the Enhanced Mitigation Experience Toolkit (EMET) can be used to mitigate some exploitation behavior. (Citation: Microsoft Security Response Center August 2017) Control flow inte"
   },
   {
     "query_id": 5,
-    "query": "What role does dietary fiber play in digestive health?",
-    "ground_truth": "Dietary fiber plays a crucial role in maintaining digestive health. Insoluble fiber, found in whole grains, vegetables, and wheat bran, adds bulk to stool and promotes regular bowel movements, helping to prevent constipation. Soluble fiber, found in oats, beans, fruits, and psyllium, dissolves in water to form a gel-like substance that slows digestion and nutrient absorption. This can help regulate blood sugar levels and lower cholesterol. Fiber also serves as a prebiotic, feeding beneficial gut bacteria that produce short-chain fatty acids important for colon health. Adequate fiber intake is associated with a reduced risk of developing colorectal cancer, diverticular disease, and cardiovascular disease.",
-    "source_passage": "Chapter on Fiber and Digestive Health - Human Nutrition 2020 Edition"
+    "query": "Why are hardcoded credentials considered distinct from default credentials in terms of system modification and operator awareness?",
+    "ground_truth": "Hardcoded credentials are built into the system in a way that they either cannot be changed by the asset owner, or may be infeasible to change because of the impact it would cause to the control system operation. Additionally, these credentials may be reused across whole product lines or device models and are often not published or known to the owner and operators of the asset.",
+    "source_passage": "T0891\tattack-pattern--c9a8d958-fcdb-40d2-af4c-461c8031651a\tHardcoded Credentials\tAdversaries may leverage credentials that are hardcoded in software or firmware to gain an unauthorized interactive user session to an asset. Examples credentials that may be hardcoded in an asset include:\n\n* Username/Passwords\n* Cryptographic keys/Certificates\n* API tokens\n\nUnlike [Default Credentials](https://attack.mitre.org/techniques/T0812), these credentials are built into the system in a way that they either "
   },
   {
     "query_id": 6,
-    "query": "What are the health consequences of iron deficiency?",
-    "ground_truth": "Iron deficiency is one of the most common nutritional deficiencies worldwide. The primary consequence is iron deficiency anemia, characterized by a reduction in the number and size of red blood cells and decreased hemoglobin levels. Symptoms include fatigue, weakness, pale skin, shortness of breath, dizziness, cold hands and feet, and impaired cognitive function. In children, iron deficiency can lead to developmental delays and behavioral disturbances. Pregnant women with iron deficiency are at increased risk for preterm delivery and low birth weight infants. Iron deficiency also impairs immune function, making individuals more susceptible to infections. Groups at highest risk include infants, young children, adolescent girls, pregnant women, and women of childbearing age.",
-    "source_passage": "Chapter on Minerals - Iron - Human Nutrition 2020 Edition"
+    "query": "What is the significance of adversaries creating accounts, sometimes using predefined account names and passwords?",
+    "ground_truth": "The significance is to provide a means of backup access for persistence. Adversaries may use predefined account names and passwords to achieve this goal. This information is cited from Booz Allen Hamilton.",
+    "source_passage": "Adversaries may also create accounts, sometimes using predefined account names and passwords, to provide a means of backup access for persistence. (Citation: Booz Allen Hamilton)"
   },
   {
     "query_id": 7,
-    "query": "How does the body process and metabolize lipids?",
-    "ground_truth": "Lipid metabolism begins with digestion in the mouth and stomach, where lingual and gastric lipases start breaking down triglycerides. The majority of lipid digestion occurs in the small intestine, where bile salts emulsify fats into smaller droplets, increasing the surface area for pancreatic lipase to act upon. Pancreatic lipase breaks triglycerides into monoglycerides and fatty acids. These products are absorbed by intestinal cells, reassembled into triglycerides, packaged into chylomicrons, and transported via the lymphatic system into the bloodstream. In the bloodstream, lipoprotein lipase breaks down triglycerides in chylomicrons for uptake by cells. The liver plays a central role in lipid metabolism, producing VLDL to distribute lipids and converting them to LDL. HDL particles help transport excess cholesterol back to the liver for excretion.",
-    "source_passage": "Chapter on Lipids - Human Nutrition 2020 Edition"
+    "query": "How does the range mode of the Industroyer IEC 104 module function across its two stages?",
+    "ground_truth": "The range mode functions by executing a two-stage process to manipulate system states. In the initial stage, it gathers Information Object Addresses and sends select and execute packets to switch the state of specific targets. Subsequently, the second stage enters an infinite loop to switch the state of all previously discovered IOAs.",
+    "source_passage": "S0604\tIndustroyer\tmalware--e401d4fe-f0c9-44f0-98e6-f93487678808\tsoftware\tuses\tT0806\tBrute Force I/O\tattack-pattern--8e7089d3-fba2-44f8-94a8-9a79c53920c4\ttechnique\tThe [Industroyer](https://attack.mitre.org/software/S0604) IEC 104 module has 3 modes available to perform its attack. These modes are range, shift, and sequence. The range mode operates in 2 stages. The first stage of range mode gathers Information Object Addresses (IOA) and sends select and execute packets to switch the state. The se"
   },
   {
     "query_id": 8,
-    "query": "What is the significance of Basal Metabolic Rate (BMR) in nutrition?",
-    "ground_truth": "Basal Metabolic Rate (BMR) represents the minimum amount of energy required to sustain vital body functions at rest, including breathing, circulation, cell production, nutrient processing, and temperature regulation. BMR accounts for approximately 60-75% of total daily energy expenditure, making it the largest component of energy use. Factors affecting BMR include age, sex, body composition, body size, hormonal status, and genetics. Lean muscle mass increases BMR because muscle tissue is more metabolically active than fat tissue. BMR decreases with age due to loss of lean body mass. Understanding BMR is essential in nutrition for determining caloric needs, designing weight management plans, and assessing metabolic health. It serves as the foundation for calculating Total Daily Energy Expenditure (TDEE).",
-    "source_passage": "Chapter on Energy Metabolism - Human Nutrition 2020 Edition"
-  },
-  {
-    "query_id": 9,
-    "query": "What are the primary functions of calcium in the human body?",
-    "ground_truth": "Calcium is the most abundant mineral in the human body, with approximately 99% stored in bones and teeth, providing structural support and strength. The remaining 1% circulates in the blood and soft tissues, where it plays critical roles in muscle contraction, nerve signal transmission, blood clotting, and enzyme activation. Calcium is essential for maintaining the heartbeat and proper cardiac function. Blood calcium levels are tightly regulated by parathyroid hormone (PTH), calcitonin, and vitamin D. When blood calcium drops, PTH stimulates calcium release from bones, increases calcium absorption in the intestines, and reduces calcium excretion by the kidneys. Inadequate calcium intake over time can lead to osteoporosis, a condition characterized by reduced bone density and increased fracture risk.",
-    "source_passage": "Chapter on Minerals - Calcium - Human Nutrition 2020 Edition"
-  },
-  {
-    "query_id": 10,
-    "query": "How do antioxidants protect the body from oxidative stress?",
-    "ground_truth": "Antioxidants protect the body by neutralizing free radicals, which are unstable molecules produced during normal metabolic processes and from external sources such as pollution, UV radiation, and cigarette smoke. Free radicals can damage cells, proteins, lipids, and DNA through a process called oxidative stress, which is linked to aging and chronic diseases including cardiovascular disease, cancer, and neurodegenerative disorders. Antioxidants donate electrons to free radicals, stabilizing them and preventing cellular damage. Key dietary antioxidants include vitamin C, vitamin E, beta-carotene (provitamin A), and selenium. Vitamin C acts primarily in aqueous environments, while vitamin E protects cell membranes. The body also produces endogenous antioxidant enzymes such as superoxide dismutase, catalase, and glutathione peroxidase.",
-    "source_passage": "Chapter on Antioxidants - Human Nutrition 2020 Edition"
-  },
-  {
-    "query_id": 11,
-    "query": "What are the Dietary Reference Intakes (DRIs) and how are they used?",
-    "ground_truth": "Dietary Reference Intakes (DRIs) are a set of reference values used for planning and assessing nutrient intakes of healthy populations. DRIs include several categories: the Estimated Average Requirement (EAR), which meets the needs of 50% of the population; the Recommended Dietary Allowance (RDA), which meets the needs of 97-98% of the population; Adequate Intake (AI), used when there is insufficient evidence to establish an EAR; and the Tolerable Upper Intake Level (UL), the maximum daily intake unlikely to cause adverse health effects. DRIs are developed by expert committees and are used by healthcare professionals for dietary planning, nutrition policy, food labeling, and assessing the nutritional adequacy of diets. They vary by age, sex, and life stage, reflecting different nutritional needs throughout the lifespan.",
-    "source_passage": "Chapter on Nutrition Standards - Human Nutrition 2020 Edition"
+    "query": "How does application isolation mitigate the Exploit Public-Facing Application attack, and what specific built-in features are cited as examples for implementation?",
+    "ground_truth": "Application isolation mitigates the Exploit Public-Facing Application attack by limiting the other processes and system features an exploited target can access. Examples of built-in features used to achieve this include software restriction policies, AppLocker for Windows, and SELinux or AppArmor for Linux. This approach ensures that even if an application is exploited, the attacker's access is restricted to the isolated environment.",
+    "source_passage": "M0948\tApplication Isolation and Sandboxing\tcourse-of-action--059ba11e-e3dc-49aa-84ca-88197f40d4ea\tmitigation\tmitigates\tT0819\tExploit Public-Facing Application\tattack-pattern--32632a95-6856-47b9-9ab7-fea5cd7dce00\ttechnique\tApplication isolation will limit the other processes and system features an exploited target can access. Examples of built in features are software restriction policies, AppLocker for Windows, and SELinux or AppArmor for Linux.\trelationship--e767c178-e4b2-490a-b544-bb1b2d6c7de4"
   }
 ]

@@ -37,42 +37,52 @@ import os
 #   - max_tokens: 生成的最大 token 数量
 
 LLM_CONFIGS = {
-    # ---- TinyLlama 1.1B ----
-    # 最小的模型，适合边缘设备部署，但语言理解和生成能力有限
-    "tinyllama": {
-        "api_key": os.environ.get("TINYLLAMA_API_KEY", "ollama"),
-        "base_url": os.environ.get("TINYLLAMA_BASE_URL", "http://localhost:11434/v1"),
-        "model_name": os.environ.get("TINYLLAMA_MODEL", "tinyllama"),
-        "temperature": 0.7,
-        "max_tokens": 1024,
-    },
+    # # ---- TinyLlama 1.1B ----
+    # # 最小的模型，适合边缘设备部署，但语言理解和生成能力有限
+    # "tinyllama": {
+    #     "api_key": os.environ.get("TINYLLAMA_API_KEY", "ollama"),
+    #     "base_url": os.environ.get("TINYLLAMA_BASE_URL", "http://localhost:11434/v1"),
+    #     "model_name": os.environ.get("TINYLLAMA_MODEL", "tinyllama"),
+    #     "temperature": 0.7,
+    #     "max_tokens": 1024,
+    # },
 
-    # ---- Mistral 7B ----
-    # 高效推理能力，在同参数级别中表现出色
-    "mistral": {
-        "api_key": os.environ.get("MISTRAL_API_KEY", "ollama"),
-        "base_url": os.environ.get("MISTRAL_BASE_URL", "http://localhost:11434/v1"),
-        "model_name": os.environ.get("MISTRAL_MODEL", "mistral"),
-        "temperature": 0.7,
-        "max_tokens": 1024,
-    },
+    # # ---- Mistral 7B ----
+    # # 高效推理能力，在同参数级别中表现出色
+    # "mistral": {
+    #     "api_key": os.environ.get("MISTRAL_API_KEY", "ollama"),
+    #     "base_url": os.environ.get("MISTRAL_BASE_URL", "http://localhost:11434/v1"),
+    #     "model_name": os.environ.get("MISTRAL_MODEL", "mistral"),
+    #     "temperature": 0.7,
+    #     "max_tokens": 1024,
+    # },
 
-    # ---- Llama 3.1 8B ----
+    # # ---- Llama 3.1 8B ----
+    # # 增强的推理能力和现代架构
+    # "llama3.1": {
+    #     "api_key": os.environ.get("LLAMA31_API_KEY", "ollama"),
+    #     "base_url": os.environ.get("LLAMA31_BASE_URL", "http://localhost:11434/v1"),
+    #     "model_name": os.environ.get("LLAMA31_MODEL", "llama3.1"),
+    #     "temperature": 0.7,
+    #     "max_tokens": 1024,
+    # },
+
+    # # ---- Llama 1 13B ----
+    # # 强大的少样本学习能力，但基于较旧的架构
+    # "llama1-13b": {
+    #     "api_key": os.environ.get("LLAMA1_API_KEY", "ollama"),
+    #     "base_url": os.environ.get("LLAMA1_BASE_URL", "http://localhost:11434/v1"),
+    #     "model_name": os.environ.get("LLAMA1_MODEL", "llama2:13b"),
+    #     "temperature": 0.7,
+    #     "max_tokens": 1024,
+    # },
+
+    # ---- Llama 3.2 3B ----
     # 增强的推理能力和现代架构
-    "llama3.1": {
-        "api_key": os.environ.get("LLAMA31_API_KEY", "ollama"),
-        "base_url": os.environ.get("LLAMA31_BASE_URL", "http://localhost:11434/v1"),
-        "model_name": os.environ.get("LLAMA31_MODEL", "llama3.1"),
-        "temperature": 0.7,
-        "max_tokens": 1024,
-    },
-
-    # ---- Llama 1 13B ----
-    # 强大的少样本学习能力，但基于较旧的架构
-    "llama1-13b": {
-        "api_key": os.environ.get("LLAMA1_API_KEY", "ollama"),
-        "base_url": os.environ.get("LLAMA1_BASE_URL", "http://localhost:11434/v1"),
-        "model_name": os.environ.get("LLAMA1_MODEL", "llama2:13b"),
+    "llama3.2": {
+        "api_key": os.environ.get("LLAMA32_API_KEY", "ollama"),
+        "base_url": os.environ.get("LLAMA32_BASE_URL", "http://localhost:11434/v1"),
+        "model_name": os.environ.get("LLAMA32_MODEL", "llama3.2:3b"),
         "temperature": 0.7,
         "max_tokens": 1024,
     },
@@ -91,7 +101,7 @@ LLM_CONFIGS = {
 GROUND_TRUTH_LLM_CONFIG = {
     "api_key": os.environ.get("GT_LLM_API_KEY", "ollama"),
     "base_url": os.environ.get("GT_LLM_BASE_URL", "http://localhost:11434/v1"),
-    "model_name": os.environ.get("GT_LLM_MODEL", "llama3.1"),
+    "model_name": os.environ.get("GT_LLM_MODEL", "qwen3.5:9b"),
     "temperature": 0.3,    # 较低温度，确保生成内容准确、稳定
     "max_tokens": 2048,    # Ground Truth 答案可能较长，需要更多 token
 }
@@ -116,13 +126,13 @@ EMBEDDING_CONFIG = {
 
     # 本地模式配置
     "model_name": os.environ.get(
-        "EMBEDDING_MODEL", "all-MiniLM-L6-v2"
+        "EMBEDDING_MODEL", "mahonzhan/all-MiniLM-L6-v2"
     ),
 
-    # API 模式配置（当 mode="api" 时使用）
-    "api_key": os.environ.get("EMBEDDING_API_KEY", ""),
-    "base_url": os.environ.get("EMBEDDING_BASE_URL", ""),
-    "api_model_name": os.environ.get("EMBEDDING_API_MODEL", ""),
+    # # API 模式配置（当 mode="api" 时使用）
+    # "api_key": os.environ.get("EMBEDDING_API_KEY", ""),
+    # "base_url": os.environ.get("EMBEDDING_BASE_URL", ""),
+    # "api_model_name": os.environ.get("EMBEDDING_API_MODEL", ""),
 
     # 模型维度：all-MiniLM-L6-v2 的输出维度为 384
     "embedding_dim": 384,

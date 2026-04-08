@@ -5,7 +5,7 @@
 
 功能说明：
     加载 step3 生成的原始输出 CSV，与 Ground Truth 对比，
-    计算所有 7 个评估指标并输出统计结果。
+    计算所有 8 个评估指标并输出统计结果。
 
     前置条件：
     - results/raw_outputs_*.csv 已存在 (step3)
@@ -37,6 +37,7 @@ from evaluation.metrics import (
     compute_bleu,
     compute_rouge,
     compute_bertscore,
+    compute_nli_batch,
     compute_confidence_interval,
     compute_improvement,
 )
@@ -44,20 +45,16 @@ from evaluation.metrics import (
 
 def parse_args():
     """解析命令行参数。"""
-    parser = argparse.ArgumentParser(
-        description="步骤 4: 评估实验结果"
-    )
+    parser = argparse.ArgumentParser(description="步骤 4: 评估实验结果")
     parser.add_argument(
-        "--input", type=str, default=None,
-        help="原始输出 CSV 文件路径（默认使用最新的）"
+        "--input",
+        type=str,
+        default=None,
+        help="原始输出 CSV 文件路径（默认使用最新的）",
     )
+    parser.add_argument("--output-dir", type=str, default=None, help="评估结果输出目录")
     parser.add_argument(
-        "--output-dir", type=str, default=None,
-        help="评估结果输出目录"
-    )
-    parser.add_argument(
-        "--confidence", type=float, default=None,
-        help="置信区间水平（默认 0.90）"
+        "--confidence", type=float, default=None, help="置信区间水平（默认 0.90）"
     )
     return parser.parse_args()
 
@@ -73,7 +70,8 @@ def find_latest_raw_output(output_dir: str) -> str:
         str: 最新文件的完整路径
     """
     files = [
-        f for f in os.listdir(output_dir)
+        f
+        for f in os.listdir(output_dir)
         if f.startswith("raw_outputs_") and f.endswith(".csv")
     ]
     if not files:
@@ -86,9 +84,7 @@ def find_latest_raw_output(output_dir: str) -> str:
 
 
 def evaluate_from_csv(
-    csv_path: str,
-    ground_truth: list,
-    confidence_level: float = 0.90
+    csv_path: str, ground_truth: list, confidence_level: float = 0.90
 ) -> dict:
     """
     从 CSV 文件加载原始输出并计算所有指标。
@@ -109,8 +105,16 @@ def evaluate_from_csv(
     gt_map = {item["query_id"]: item["ground_truth"] for item in ground_truth}
 
     # 指标名称列表
-    metric_names = ["bleu", "rouge1", "rouge2", "rougeL",
-                    "bert_precision", "bert_recall", "bert_f1"]
+    metric_names = [
+        "bleu",
+        "rouge1",
+        "rouge2",
+        "rougeL",
+        "bert_precision",
+        "bert_recall",
+        "bert_f1",
+        "nli",
+    ]
 
     # 按模型和模式分组
     models = df["model"].unique()
@@ -125,16 +129,20 @@ def evaluate_from_csv(
         for mode in modes:
             # 筛选当前模型和模式的成功记录
             subset = df[
-                (df["model"] == model) &
-                (df["mode"] == mode) &
-                (df["success"] == True)
+                (df["model"] == model) & (df["mode"] == mode) & (df["success"] == True)
             ]
             print(f"  [{mode}] {len(subset)} 条成功记录")
 
             if subset.empty:
                 final_results[model][mode] = {
-                    m: {"mean": 0.0, "std": 0.0, "ci_lower": 0.0,
-                        "ci_upper": 0.0, "margin_of_error": 0.0, "n": 0}
+                    m: {
+                        "mean": 0.0,
+                        "std": 0.0,
+                        "ci_lower": 0.0,
+                        "ci_upper": 0.0,
+                        "margin_of_error": 0.0,
+                        "n": 0,
+                    }
                     for m in metric_names
                 }
                 continue
@@ -153,8 +161,14 @@ def evaluate_from_csv(
             if not references:
                 print(f"  ⚠️  没有有效的参考/候选对")
                 final_results[model][mode] = {
-                    m: {"mean": 0.0, "std": 0.0, "ci_lower": 0.0,
-                        "ci_upper": 0.0, "margin_of_error": 0.0, "n": 0}
+                    m: {
+                        "mean": 0.0,
+                        "std": 0.0,
+                        "ci_lower": 0.0,
+                        "ci_upper": 0.0,
+                        "margin_of_error": 0.0,
+                        "n": 0,
+                    }
                     for m in metric_names
                 }
                 continue
@@ -175,6 +189,8 @@ def evaluate_from_csv(
             # 计算语义指标（批量）
             print(f"  计算 BERTScore ({len(references)} 个样本)...")
             bert_results = compute_bertscore(references, candidates)
+            print(f"  计算 NLI Score ({len(references)} 个样本)...")
+            nli_scores = compute_nli_batch(references, candidates)
 
             # 汇总
             all_scores = {
@@ -185,6 +201,7 @@ def evaluate_from_csv(
                 "bert_precision": bert_results["precision"],
                 "bert_recall": bert_results["recall"],
                 "bert_f1": bert_results["f1"],
+                "nli": nli_scores,
             }
 
             # 计算统计量
@@ -198,7 +215,9 @@ def evaluate_from_csv(
             # 打印摘要
             for m in metric_names:
                 s = mode_stats[m]
-                print(f"    {m}: mean={s['mean']:.4f} [{s['ci_lower']:.4f}, {s['ci_upper']:.4f}]")
+                print(
+                    f"    {m}: mean={s['mean']:.4f} [{s['ci_lower']:.4f}, {s['ci_upper']:.4f}]"
+                )
 
     return final_results
 
@@ -221,8 +240,16 @@ def save_evaluation_results(results: dict, output_dir: str):
     print(f"💾 统计结果: {stats_path}")
 
     # 2. 保存改进汇总 (CSV)
-    metric_names = ["bleu", "rouge1", "rouge2", "rougeL",
-                    "bert_precision", "bert_recall", "bert_f1"]
+    metric_names = [
+        "bleu",
+        "rouge1",
+        "rouge2",
+        "rougeL",
+        "bert_precision",
+        "bert_recall",
+        "bert_f1",
+        "nli",
+    ]
     rows = []
     for model_key in results.keys():
         row = {"model": model_key}
@@ -270,7 +297,7 @@ def main():
     print(f"\n📊 RAG 改进幅度摘要:")
     for model_key in results.keys():
         print(f"\n  [{model_key}]")
-        for m in ["bleu", "rouge1", "rougeL", "bert_f1"]:
+        for m in ["bleu", "rouge1", "rougeL", "bert_f1", "nli"]:
             bl = results[model_key].get("baseline", {}).get(m, {}).get("mean", 0)
             rg = results[model_key].get("rag", {}).get(m, {}).get("mean", 0)
             imp = compute_improvement(bl, rg)

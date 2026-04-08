@@ -4,7 +4,7 @@
 ===========================================================
 
 功能说明：
-    实现论文中使用的所有 7 个评估指标，分为两类：
+    实现论文中使用的所有 8 个评估指标，分为三类：
 
     词汇相似度指标 (Lexical Similarity):
         1. BLEU  — n-gram 精确度，衡量翻译/生成质量
@@ -16,6 +16,9 @@
         5. BERTScore Precision — 语义精确度
         6. BERTScore Recall — 语义召回率
         7. BERTScore F1 — 精确度和召回率的调和平均
+
+    自然语言推理指标 (Natural Language Inference):
+        8. NLI — 判断候选文本是否蕴含参考文本
 
     每个指标的值域为 [0, 1]：
         0 = 完全不匹配
@@ -29,6 +32,7 @@
 
 import numpy as np
 from scipy import stats
+from transformers import pipeline
 
 # ---- BLEU 相关 ----
 # nltk 的 BLEU 实现支持 n-gram 精确度和平滑方法
@@ -41,19 +45,68 @@ from rouge_score import rouge_scorer
 # ---- BERTScore 相关 ----
 # bert-score 库使用预训练 BERT 模型计算语义相似度
 from bert_score import score as bert_score_fn
+import bert_score.utils as bert_score_utils
+
+# ---- NLI 相关 ----
+_nli_pipeline = None
 
 
 # 确保 NLTK 数据已下载
 import nltk
+
 try:
-    nltk.data.find('tokenizers/punkt_tab')
+    nltk.data.find("tokenizers/punkt_tab")
 except LookupError:
-    nltk.download('punkt_tab', quiet=True)
+    nltk.download("punkt_tab", quiet=True)
+
+
+def _safe_tokenizer_max_length(tokenizer, fallback: int = 512) -> int:
+    """返回可安全传给 tokenizer truncation 的 max_length。"""
+    max_len = getattr(tokenizer, "model_max_length", fallback)
+
+    try:
+        max_len = int(max_len)
+    except (TypeError, ValueError, OverflowError):
+        max_len = fallback
+
+    # transformers 常用超大占位值表示“无限长”，Rust tokenizer 无法处理
+    if max_len <= 0 or max_len > 1_000_000:
+        max_len = fallback
+
+    return max_len
+
+
+def _patch_bertscore_sent_encode_if_needed():
+    """修复 bert-score 在部分 tokenizer 上 truncation 溢出的问题。"""
+    if getattr(bert_score_utils, "_safe_sent_encode_patched", False):
+        return
+
+    def _safe_sent_encode(tokenizer, sent):
+        sent = sent.strip()
+        if sent == "":
+            return tokenizer.build_inputs_with_special_tokens([])
+
+        max_len = _safe_tokenizer_max_length(tokenizer, fallback=512)
+        encode_kwargs = {
+            "add_special_tokens": True,
+            "max_length": max_len,
+            "truncation": True,
+        }
+
+        tokenizer_name = tokenizer.__class__.__name__.lower()
+        if "roberta" in tokenizer_name or "gpt2" in tokenizer_name:
+            encode_kwargs["add_prefix_space"] = True
+
+        return tokenizer.encode(sent, **encode_kwargs)
+
+    bert_score_utils.sent_encode = _safe_sent_encode
+    bert_score_utils._safe_sent_encode_patched = True
 
 
 # =============================================
 # 1. BLEU Score 计算
 # =============================================
+
 
 def compute_bleu(reference: str, candidate: str) -> float:
     """
@@ -107,10 +160,10 @@ def compute_bleu(reference: str, candidate: str) -> float:
     # 权重 (0.25, 0.25, 0.25, 0.25) 表示 1-4 gram 等权
     try:
         bleu = sentence_bleu(
-            [reference_tokens],      # 参考文本（包裹在列表中）
-            candidate_tokens,         # 候选文本
+            [reference_tokens],  # 参考文本（包裹在列表中）
+            candidate_tokens,  # 候选文本
             weights=(0.25, 0.25, 0.25, 0.25),  # 1-4 gram 等权
-            smoothing_function=smoother  # 平滑方法
+            smoothing_function=smoother,  # 平滑方法
         )
     except Exception:
         # 如果计算失败（例如文本过短），返回 0
@@ -122,6 +175,7 @@ def compute_bleu(reference: str, candidate: str) -> float:
 # =============================================
 # 2. ROUGE Score 计算
 # =============================================
+
 
 def compute_rouge(reference: str, candidate: str) -> dict:
     """
@@ -167,8 +221,8 @@ def compute_rouge(reference: str, candidate: str) -> dict:
     # 创建 ROUGE 评分器
     # 指定要计算的 ROUGE 变体
     scorer = rouge_scorer.RougeScorer(
-        ['rouge1', 'rouge2', 'rougeL'],
-        use_stemmer=True  # 使用词干化，"running" 和 "run" 视为匹配
+        ["rouge1", "rouge2", "rougeL"],
+        use_stemmer=True,  # 使用词干化，"running" 和 "run" 视为匹配
     )
 
     # 处理边界情况
@@ -182,9 +236,9 @@ def compute_rouge(reference: str, candidate: str) -> dict:
     # rouge_scorer 返回 precision, recall, fmeasure 三个值
     # 这里使用 fmeasure，与论文的评估方式一致
     return {
-        "rouge1": scores['rouge1'].fmeasure,  # ROUGE-1 F1
-        "rouge2": scores['rouge2'].fmeasure,  # ROUGE-2 F1
-        "rougeL": scores['rougeL'].fmeasure,  # ROUGE-L F1
+        "rouge1": scores["rouge1"].fmeasure,  # ROUGE-1 F1
+        "rouge2": scores["rouge2"].fmeasure,  # ROUGE-2 F1
+        "rougeL": scores["rougeL"].fmeasure,  # ROUGE-L F1
     }
 
 
@@ -192,12 +246,13 @@ def compute_rouge(reference: str, candidate: str) -> dict:
 # 3. BERTScore 计算
 # =============================================
 
+
 def compute_bertscore(
     references: list,
     candidates: list,
     model_type: str = "microsoft/deberta-xlarge-mnli",
     lang: str = "en",
-    batch_size: int = 32
+    batch_size: int = 32,
 ) -> dict:
     """
     计算 BERTScore（基于 BERT 的语义相似度评分）。
@@ -250,8 +305,7 @@ def compute_bertscore(
     # 验证输入
     if len(references) != len(candidates):
         raise ValueError(
-            f"参考文本和候选文本数量不匹配: "
-            f"{len(references)} vs {len(candidates)}"
+            f"参考文本和候选文本数量不匹配: {len(references)} vs {len(candidates)}"
         )
 
     if not references:
@@ -259,19 +313,36 @@ def compute_bertscore(
 
     print(f"🧠 正在计算 BERTScore ({len(references)} 个样本)...")
 
+    # 先应用兼容补丁，避免 tokenizer truncation 的 OverflowError。
+    _patch_bertscore_sent_encode_if_needed()
+
     # 调用 bert_score 库计算
     # verbose=True 显示进度条
     # rescale_with_baseline=False: 不进行基线校正
     #   论文中直接使用原始分数，不进行额外校正
-    P, R, F1 = bert_score_fn(
-        candidates,
-        references,
-        model_type=model_type,
-        lang=lang,
-        batch_size=batch_size,
-        verbose=True,
-        rescale_with_baseline=False  # 使用原始分数
-    )
+    # 某些 fast tokenizer 的 model_max_length 可能是超大占位值，
+    # 在底层 Rust tokenizer 启用 truncation 时会触发 OverflowError。
+    # 因此先尝试 fast tokenizer，失败后回退到 slow tokenizer。
+    score_kwargs = {
+        "model_type": model_type,
+        "lang": lang,
+        "batch_size": batch_size,
+        "verbose": True,
+        "rescale_with_baseline": False,
+    }
+
+    try:
+        P, R, F1 = bert_score_fn(
+            candidates, references, use_fast_tokenizer=True, **score_kwargs
+        )
+    except OverflowError as e:
+        print(
+            "⚠️  检测到 fast tokenizer truncation 溢出，"
+            "自动回退到 slow tokenizer 重试..."
+        )
+        P, R, F1 = bert_score_fn(
+            candidates, references, use_fast_tokenizer=False, **score_kwargs
+        )
 
     # 将 PyTorch tensor 转换为 Python list
     precision_list = P.tolist()
@@ -283,18 +354,14 @@ def compute_bertscore(
     print(f"   平均 Recall: {np.mean(recall_list):.4f}")
     print(f"   平均 F1: {np.mean(f1_list):.4f}")
 
-    return {
-        "precision": precision_list,
-        "recall": recall_list,
-        "f1": f1_list
-    }
+    return {"precision": precision_list, "recall": recall_list, "f1": f1_list}
 
 
 def compute_bertscore_single(
     reference: str,
     candidate: str,
     model_type: str = "microsoft/deberta-xlarge-mnli",
-    lang: str = "en"
+    lang: str = "en",
 ) -> dict:
     """
     计算单个样本的 BERTScore。
@@ -309,26 +376,145 @@ def compute_bertscore_single(
         dict: {"precision": float, "recall": float, "f1": float}
     """
     result = compute_bertscore(
-        [reference], [candidate],
-        model_type=model_type,
-        lang=lang
+        [reference], [candidate], model_type=model_type, lang=lang
     )
     return {
         "precision": result["precision"][0],
         "recall": result["recall"][0],
-        "f1": result["f1"][0]
+        "f1": result["f1"][0],
     }
 
 
 # =============================================
-# 4. 综合指标计算
+# 4. NLI Score 计算
 # =============================================
+
+
+def _get_nli_pipeline() -> pipeline:
+    """获取或初始化 NLI pipeline（单例模式）。"""
+    global _nli_pipeline
+    if _nli_pipeline is None:
+        _nli_pipeline = pipeline(
+            "text-classification",
+            model="roberta-large-mnli",
+            truncation=True,
+            max_length=512,
+        )
+    return _nli_pipeline
+
+
+def compute_nli(reference: str, candidate: str) -> float:
+    """
+    计算 NLI（Natural Language Inference）分数。
+
+    原理：
+        NLI 衡量候选文本（premise）是否蕴含参考文本（hypothesis）。
+        使用预训练的 NLI 模型（roberta-large-mnli）判断三个类别：
+        - ENTAILMENT: 候选文本蕴含参考文本（语义一致）
+        - CONTRADICTION: 候选文本与参考文本矛盾
+        - NEUTRAL: 两者无明确蕴含关系
+
+        计算步骤：
+        1. 将 candidate 作为 premise，reference 作为 hypothesis
+        2. 拼接为 "{premise} </s> {hypothesis}" 格式
+        3. 输入 NLI 模型获取分类结果和置信度
+        4. 返回 ENTAILMENT 的置信度作为分数
+
+        论文意义：
+        - 检测模型输出是否与参考答案语义一致
+        - 识别矛盾输出（contradiction 分数高表示严重错误）
+        - 比词汇匹配更严格的语义一致性检验
+
+    输入:
+        reference (str): 参考文本（ground truth答案）
+        candidate (str): 候选文本（模型生成的答案）
+
+    输出:
+        float: NLI entailment 分数，范围 [0, 1]
+            1.0 = 完全蕴含（语义一致）
+            0.0 = 完全不蕴含（矛盾或无关）
+    """
+    if not reference.strip() or not candidate.strip():
+        return 0.0
+
+    try:
+        nli_pipe = _get_nli_pipeline()
+        text = f"{candidate} </s> {reference}"
+        result = nli_pipe(text)
+
+        # result 格式: [{'label': 'ENTAILMENT', 'score': 0.95}]
+        if isinstance(result, list) and len(result) > 0:
+            label = result[0].get("label", "")
+            score = result[0].get("score", 0.0)
+
+            if label == "ENTAILMENT":
+                return float(score)
+            elif label == "CONTRADICTION":
+                return 0.0
+            else:  # NEUTRAL
+                return float(score) * 0.5
+        return 0.0
+    except Exception:
+        return 0.0
+
+
+def compute_nli_batch(references: list, candidates: list, batch_size: int = 32) -> list:
+    """
+    批量计算 NLI 分数。
+
+    参数:
+        references (list): 参考文本列表
+        candidates (list): 候选文本列表
+        batch_size (int): 批处理大小
+
+    返回:
+        list: 每个样本的 NLI 分数列表
+    """
+    if len(references) != len(candidates):
+        raise ValueError(
+            f"参考文本和候选文本数量不匹配: {len(references)} vs {len(candidates)}"
+        )
+
+    if not references:
+        return []
+
+    print(f"🔍 正在计算 NLI Score ({len(references)} 个样本)...")
+
+    nli_pipe = _get_nli_pipeline()
+    texts = [f"{cand} </s> {ref}" for ref, cand in zip(references, candidates)]
+
+    results = nli_pipe(texts, batch_size=batch_size, truncation=True)
+
+    scores = []
+    for result in results:
+        if isinstance(result, list):
+            result = result[0]
+        label = result.get("label", "")
+        score = result.get("score", 0.0)
+
+        if label == "ENTAILMENT":
+            scores.append(float(score))
+        elif label == "CONTRADICTION":
+            scores.append(0.0)
+        else:
+            scores.append(float(score) * 0.5)
+
+    print(f"✅ NLI Score 计算完成")
+    print(f"   平均分数: {np.mean(scores):.4f}")
+
+    return scores
+
+
+# =============================================
+# 5. 综合指标计算
+# =============================================
+
 
 def compute_all_metrics(reference: str, candidate: str) -> dict:
     """
-    计算单个样本的所有 7 个评估指标。
+    计算单个样本的所有 8 个评估指标。
 
-    将 BLEU、ROUGE（3个变体）和 BERTScore（3个维度）
+    将 BLEU、ROUGE（3个变体）、BERTScore（3个维度）和 NLI
     统一计算并返回。
 
     输入:
@@ -336,7 +522,7 @@ def compute_all_metrics(reference: str, candidate: str) -> dict:
         candidate (str): 候选文本（模型生成的答案）
 
     输出:
-        dict: 包含 7 个指标的字典：
+        dict: 包含 8 个指标的字典：
             {
                 "bleu": float,
                 "rouge1": float,
@@ -344,7 +530,8 @@ def compute_all_metrics(reference: str, candidate: str) -> dict:
                 "rougeL": float,
                 "bert_precision": float,
                 "bert_recall": float,
-                "bert_f1": float
+                "bert_f1": float,
+                "nli": float
             }
     """
     # 计算词汇相似度指标
@@ -354,6 +541,9 @@ def compute_all_metrics(reference: str, candidate: str) -> dict:
     # 计算语义相似度指标
     bert_scores = compute_bertscore_single(reference, candidate)
 
+    # 计算 NLI 指标
+    nli_score = compute_nli(reference, candidate)
+
     return {
         "bleu": bleu,
         "rouge1": rouge["rouge1"],
@@ -362,13 +552,11 @@ def compute_all_metrics(reference: str, candidate: str) -> dict:
         "bert_precision": bert_scores["precision"],
         "bert_recall": bert_scores["recall"],
         "bert_f1": bert_scores["f1"],
+        "nli": nli_score,
     }
 
 
-def compute_all_metrics_batch(
-    references: list,
-    candidates: list
-) -> list:
+def compute_all_metrics_batch(references: list, candidates: list) -> list:
     """
     批量计算所有指标。
 
@@ -405,30 +593,41 @@ def compute_all_metrics_batch(
         rougeL_scores.append(rouge["rougeL"])
 
     # ---- 语义指标：批量计算 ----
-    # 批量计算更高效，因为 BERT 模型只需加载一次
+    # 批量计算更高效，因为模型只需加载一次
     bert_results = compute_bertscore(references, candidates)
+    nli_scores = compute_nli_batch(references, candidates)
 
     # ---- 组装结果 ----
     results = []
     for i in range(n):
-        results.append({
-            "bleu": bleu_scores[i],
-            "rouge1": rouge1_scores[i],
-            "rouge2": rouge2_scores[i],
-            "rougeL": rougeL_scores[i],
-            "bert_precision": bert_results["precision"][i],
-            "bert_recall": bert_results["recall"][i],
-            "bert_f1": bert_results["f1"][i],
-        })
+        results.append(
+            {
+                "bleu": bleu_scores[i],
+                "rouge1": rouge1_scores[i],
+                "rouge2": rouge2_scores[i],
+                "rougeL": rougeL_scores[i],
+                "bert_precision": bert_results["precision"][i],
+                "bert_recall": bert_results["recall"][i],
+                "bert_f1": bert_results["f1"][i],
+                "nli": nli_scores[i],
+            }
+        )
 
     # 打印汇总统计
     print(f"\n📊 评估指标汇总:")
-    metric_names = ["bleu", "rouge1", "rouge2", "rougeL",
-                    "bert_precision", "bert_recall", "bert_f1"]
+    metric_names = [
+        "bleu",
+        "rouge1",
+        "rouge2",
+        "rougeL",
+        "bert_precision",
+        "bert_recall",
+        "bert_f1",
+        "nli",
+    ]
     for name in metric_names:
         values = [r[name] for r in results]
-        print(f"   {name}: mean={np.mean(values):.4f}, "
-              f"std={np.std(values):.4f}")
+        print(f"   {name}: mean={np.mean(values):.4f}, std={np.std(values):.4f}")
 
     return results
 
@@ -437,10 +636,8 @@ def compute_all_metrics_batch(
 # 5. 统计分析：置信区间
 # =============================================
 
-def compute_confidence_interval(
-    scores: list,
-    confidence: float = 0.90
-) -> dict:
+
+def compute_confidence_interval(scores: list, confidence: float = 0.90) -> dict:
     """
     计算给定分数列表的置信区间。
 
@@ -485,7 +682,7 @@ def compute_confidence_interval(
             "ci_lower": mean_val,
             "ci_upper": mean_val,
             "margin_of_error": 0.0,
-            "n": n
+            "n": n,
         }
 
     # 步骤1: 计算均值和标准差
@@ -512,7 +709,7 @@ def compute_confidence_interval(
         "ci_lower": ci_lower,
         "ci_upper": ci_upper,
         "margin_of_error": margin_of_error,
-        "n": n
+        "n": n,
     }
 
 
